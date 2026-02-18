@@ -28,7 +28,8 @@ const quizAttemptSchema = new mongoose.Schema({
         options: [String],
         userAnswer: Number,
         correctAnswer: Number,
-        isCorrect: Boolean
+        isCorrect: Boolean,
+        topic: String
     }],
     createdAt: {
         type: Date,

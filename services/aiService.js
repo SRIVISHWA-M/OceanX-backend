@@ -131,7 +131,8 @@ Requirements:
   {
     "question": "The question text",
     "options": ["Option A", "Option B", "Option C", "Option D"],
-    "answer": 1
+    "answer": 1,
+    "topic": "The specific topic this question covers"
   }
 ]
 
@@ -162,7 +163,8 @@ Generate the quiz JSON:`;
             options: item.options || item.choices || item.answers || item.alternatives || [],
             answer: typeof item.answer === 'number' ? item.answer :
                 (typeof item.correct === 'number' ? item.correct :
-                    (typeof item.correctAnswer === 'number' ? item.correctAnswer : 0))
+                    (typeof item.correctAnswer === 'number' ? item.correctAnswer : 0)),
+            topic: item.topic || "General Knowledge"
         }));
 
         return quiz.slice(0, 10); // Ensure exactly 10 if more were generated
@@ -175,7 +177,7 @@ Generate the quiz JSON:`;
             try {
                 const completion = await groq.chat.completions.create({
                     messages: [
-                        { role: 'system', content: 'Return ONLY a JSON array of 10 multiple choice questions. Format: [{"question": "...", "options": ["A", "B", "C", "D"], "answer": 0}]' },
+                        { role: 'system', content: 'Return ONLY a JSON array of 10 multiple choice questions. Format: [{"question": "...", "options": ["A", "B", "C", "D"], "answer": 0, "topic": "Topic Name"}]' },
                         { role: 'user', content: `Generate a 10-question quiz based on this content: ${note.content || note.title}` }
                     ],
                     model: 'llama-3.1-8b-instant',
@@ -194,7 +196,8 @@ Generate the quiz JSON:`;
                     options: item.options || item.choices || item.answers || item.alternatives || [],
                     answer: typeof item.answer === 'number' ? item.answer :
                         (typeof item.correct === 'number' ? item.correct :
-                            (typeof item.correctAnswer === 'number' ? item.correctAnswer : 0))
+                            (typeof item.correctAnswer === 'number' ? item.correctAnswer : 0)),
+                    topic: item.topic || "General Knowledge"
                 }));
 
                 return normalized.slice(0, 10);
@@ -220,7 +223,15 @@ Generate the quiz JSON:`;
  * @param {number} total - Total questions
  * @returns {Promise<string>} - AI generated feedback
  */
-const getQuizFeedback = async (note, score, total) => {
+/**
+ * Generate AI feedback for a quiz result with structured suggestions
+ * @param {Object} note - Note object
+ * @param {number} score - Number of correct answers
+ * @param {number} total - Total questions
+ * @param {Array} detailedAnswers - Array of answer objects with topic info
+ * @returns {Promise<Object>} - AI generated feedback object
+ */
+const getQuizFeedback = async (note, score, total, detailedAnswers) => {
     try {
         if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
             throw new Error('Gemini API key not configured.');
@@ -229,20 +240,46 @@ const getQuizFeedback = async (note, score, total) => {
         const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
         const accuracy = Math.round((score / total) * 100);
 
+        // Identify weak topics
+        const incorrectAnswers = detailedAnswers.filter(a => !a.isCorrect);
+        const weakTopics = [...new Set(incorrectAnswers.map(a => a.topic || "General"))];
+
         const prompt = `You are a supportive and expert study coach.
 A student just completed a quiz based on the material: "${note.title}".
 Score: ${score}/${total} (${accuracy}%)
 
-Based on this performance, provide a short, motivating, and personalized insight (2-3 sentences).
-- If they did great (80%+), celebrate their mastery and suggest what to tackle next.
-- If they did okay (50-79%), acknowledge their progress and suggest focusing on specific areas they might have missed.
-- If they struggled (<50%), provide encouragement and a concrete study tip (e.g., "Review the summary first").
+Weak Topics identified based on incorrect answers: ${weakTopics.join(', ') || "None (Perfect Score!)"}
 
-Feedback:`;
+Based on this performance, provide a structured response in JSON format:
+1. "generalFeedback": A short, motivating message (2 sentences).
+2. "suggestions": An array of specific study tips for the weak topics. If the score is perfect, suggest advanced related topics.
+
+FORMAT EXACTLY AS JSON:
+{
+  "generalFeedback": "...",
+  "suggestions": [
+    { "topic": "Weak Topic 1", "tip": "Specific advice on what to review..." },
+    { "topic": "Weak Topic 2", "tip": "..." }
+  ]
+}`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
-        return response.text().trim();
+        const text = response.text();
+
+        // Extract JSON similar to quiz generation
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : text;
+
+        try {
+            return JSON.parse(jsonStr);
+        } catch (e) {
+            console.error("Failed to parse feedback JSON", e);
+            return {
+                generalFeedback: text.replace(/```json|```/g, '').trim(),
+                suggestions: []
+            };
+        }
     } catch (error) {
         const errorMsg = error.message.toLowerCase();
 
@@ -251,10 +288,11 @@ Feedback:`;
             console.log('🔄 Gemini Quota Exceeded. Falling back to Groq for Feedback...');
             try {
                 const completion = await groq.chat.completions.create({
-                    messages: [{ role: 'user', content: `A student scored ${score}/${total} on a quiz for "${note.title}". Provide a 2-sentence supportive study insight.` }],
+                    messages: [{ role: 'user', content: `Analyze the valid JSON response format for a quiz feedback. Return ONLY JSON: { "generalFeedback": "Encouraging message", "suggestions": [{ "topic": "Topic", "tip": "Advice" }] }` }],
                     model: 'llama3-8b-8192',
+                    response_format: { type: "json_object" }
                 });
-                return completion.choices[0]?.message?.content || "Great effort! Keep practicing to master the material.";
+                return JSON.parse(completion.choices[0]?.message?.content);
             } catch (groqError) {
                 console.error('Groq Fallback Error (Feedback):', groqError);
             }
@@ -262,12 +300,10 @@ Feedback:`;
 
         console.error('AI Feedback Generation Error:', error);
 
-        if (error.status === 429 || errorMsg.includes('quota') || errorMsg.includes('limit')) {
-            // Return a static supportive message instead of failing for feedback
-            return "Great job on completing the quiz! AI is currently resting, but keep reviewing your notes to master the material even further.";
-        }
-
-        return "Great job on completing the quiz! Keep reviewing your notes to master the material even further.";
+        return {
+            generalFeedback: "Great job! Keep reviewing your notes.",
+            suggestions: []
+        };
     }
 };
 

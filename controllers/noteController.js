@@ -378,7 +378,7 @@ exports.getQuizFeedback = async (req, res, next) => {
         }
 
         const { getQuizFeedback } = require('../services/aiService');
-        const feedback = await getQuizFeedback(note, score, total);
+        const feedback = await getQuizFeedback(note, score, total, answers);
 
         // Record the quiz attempt
         try {
