@@ -225,6 +225,11 @@ exports.deleteNote = async (req, res, next) => {
             return res.status(404).json({ error: 'Note not found' });
         }
 
+        // Make sure user owns note
+        if (note.user.toString() !== req.user.id) {
+            return res.status(401).json({ error: 'User not authorized to delete this note' });
+        }
+
         // Delete associated file if it exists
         if (note.fileUrl) {
             const filePath = path.join(__dirname, '..', note.fileUrl);
