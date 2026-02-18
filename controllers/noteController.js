@@ -3,7 +3,7 @@ const Note = require('../models/Note');
 const User = require('../models/User');
 const path = require('path');
 const fs = require('fs');
-const { summarizeNote, generateQuiz, getQuizFeedback } = require('../services/aiService');
+const { summarizeNote, generateQuiz, getQuizFeedback, extractTextFromFile } = require('../services/aiService');
 
 // @desc    Toggle note in user's collection
 // @route   POST /api/notes/:id/collection

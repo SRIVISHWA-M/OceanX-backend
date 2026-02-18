@@ -59,8 +59,8 @@ Generate a smart summary:`;
     } catch (error) {
         const errorMsg = error.message.toLowerCase();
 
-        // 🚨 FALLBACK TO GROQ IF GEMINI QUOTA EXCEEDED
-        if ((error.status === 429 || errorMsg.includes('quota')) && process.env.GROQ_API_KEY) {
+        // 🚨 FALLBACK TO GROQ IF GEMINI QUOTA EXCEEDED OR SERVICE OVERLOADED
+        if ((error.status === 429 || error.status === 503 || errorMsg.includes('quota') || errorMsg.includes('service unavailable') || errorMsg.includes('overloaded')) && process.env.GROQ_API_KEY) {
             console.log('🔄 Gemini Quota Exceeded. Falling back to Groq for Summary...');
             try {
                 const completion = await groq.chat.completions.create({
@@ -169,8 +169,8 @@ Generate the quiz JSON:`;
     } catch (error) {
         const errorMsg = error.message.toLowerCase();
 
-        // 🚨 FALLBACK TO GROQ IF GEMINI QUOTA EXCEEDED
-        if ((error.status === 429 || errorMsg.includes('quota')) && process.env.GROQ_API_KEY) {
+        // 🚨 FALLBACK TO GROQ IF GEMINI QUOTA EXCEEDED OR SERVICE OVERLOADED
+        if ((error.status === 429 || error.status === 503 || errorMsg.includes('quota') || errorMsg.includes('service unavailable') || errorMsg.includes('overloaded')) && process.env.GROQ_API_KEY) {
             console.log('🔄 Gemini Quota Exceeded. Falling back to Groq for Quiz...');
             try {
                 const completion = await groq.chat.completions.create({
@@ -246,8 +246,8 @@ Feedback:`;
     } catch (error) {
         const errorMsg = error.message.toLowerCase();
 
-        // 🚨 FALLBACK TO GROQ IF GEMINI QUOTA EXCEEDED
-        if ((error.status === 429 || errorMsg.includes('quota')) && process.env.GROQ_API_KEY) {
+        // 🚨 FALLBACK TO GROQ IF GEMINI QUOTA EXCEEDED OR SERVICE OVERLOADED
+        if ((error.status === 429 || error.status === 503 || errorMsg.includes('quota') || errorMsg.includes('service unavailable') || errorMsg.includes('overloaded')) && process.env.GROQ_API_KEY) {
             console.log('🔄 Gemini Quota Exceeded. Falling back to Groq for Feedback...');
             try {
                 const completion = await groq.chat.completions.create({
@@ -336,9 +336,9 @@ FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
         } catch (error) {
             const errorMsg = error.message.toLowerCase();
 
-            // Handle Quota Error specifically
-            if (error.status === 429 || errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('exhausted') || errorMsg.includes('429')) {
-                throw new Error('AI logic is resting (Quota reached). This is a free tier limit (20 req/day). Please try again in 24 hours or upgrade.');
+            // Handle Quota/Overload Error specifically
+            if (error.status === 429 || error.status === 503 || errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('exhausted') || errorMsg.includes('429') || errorMsg.includes('overloaded')) {
+                throw new Error('AI logic is resting (Quota reached or Service Overloaded). This is a free tier limit. Please try again in moments or upgrade.');
             }
 
             // Retry for transient network errors
