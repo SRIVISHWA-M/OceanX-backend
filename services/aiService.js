@@ -116,7 +116,9 @@ const generateQuiz = async (note) => {
         const prompt = `You are an expert academic evaluator.
 Analyze the following study material and generate a high-quality interactive quiz for a student.
 
-CRITICAL INSTRUCTION: Your questions MUST be strictly based on the provided content. If the content is short, focus on the core concepts present. Do NOT generate generic questions unless the content is absolutely unusable.
+CRITICAL INSTRUCTION: Your questions MUST be strictly based on the provided content. If the content is short, focus on the core concepts present. 
+
+VARIETY INSTRUCTION: Please provide a randomized variety of questions covering different aspects of the content. Ensure a fresh selection of questions each time.
 
 Material to analyze:
 ${contentToAnalyze}
