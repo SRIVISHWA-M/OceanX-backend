@@ -252,6 +252,7 @@ exports.deleteNote = async (req, res, next) => {
 exports.generateAIQuiz = async (req, res, next) => {
     try {
         const note = await Note.findById(req.params.id);
+        const forceRefresh = req.query.refresh === 'true';
 
         if (!note) {
             return res.status(404).json({ error: 'Note not found' });
@@ -259,7 +260,7 @@ exports.generateAIQuiz = async (req, res, next) => {
 
         // Check if we already have a cached quiz (generated within last 24 hours)
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        let forceNewQuiz = false;
+        let forceNewQuiz = forceRefresh;
 
         // Generate or force OCR if content is missing for file-type notes
         if (!note.content && (note.type === 'handwritten' || note.type === 'pdf' || note.type === 'word')) {
@@ -278,7 +279,7 @@ exports.generateAIQuiz = async (req, res, next) => {
             }
         }
 
-        // Cache check - skip if we forced new content
+        // Cache check - skip if we forced new content OR requested refresh
         if (!forceNewQuiz && note.aiQuiz && note.aiQuiz.length > 0 && note.aiQuizGeneratedAt && note.aiQuizGeneratedAt > oneDayAgo) {
             console.log(`Serving cached quiz for note: ${note._id}`);
             return res.status(200).json({
